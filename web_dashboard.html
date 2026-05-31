@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跨部门协作摩擦检测</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 font-sans">
+    <nav class="bg-indigo-700 text-white p-4 shadow-lg">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <h1 class="text-xl font-bold"><i class="fa fa-handshake-o mr-2"></i>跨部门协作摩擦检测</h1>
+            <div class="space-x-4 text-sm">
+                <button onclick="showTab('survey')" class="tab-btn px-3 py-1 rounded bg-indigo-500">问卷调查</button>
+                <button onclick="showTab('heatmap')" class="tab-btn px-3 py-1 rounded hover:bg-indigo-500">摩擦热力图</button>
+                <button onclick="showTab('report')" class="tab-btn px-3 py-1 rounded hover:bg-indigo-500">改进报告</button>
+                <button onclick="showTab('action')" class="tab-btn px-3 py-1 rounded hover:bg-indigo-500">行动计划</button>
+                <button onclick="showTab('history')" class="tab-btn px-3 py-1 rounded hover:bg-indigo-500">历史</button>
+            </div>
+        </div>
+    </nav>
+    <div class="max-w-6xl mx-auto p-4">
+        <!-- 问卷调查Tab -->
+        <div id="tab-survey" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-xl shadow p-6">
+                        <h3 class="font-bold mb-4"><i class="fa fa-check-square-o mr-2 text-indigo-600"></i>协作摩擦诊断问卷</h3>
+                        <div class="mb-4">
+                            <label class="block text-sm text-gray-600 mb-2">涉及的部门（可多选）</label>
+                            <div class="flex flex-wrap gap-3" id="deptCheckbox">
+                                <label class="flex items-center gap-1"><input type="checkbox" value="市场" checked><span>市场</span></label>
+                                <label class="flex items-center gap-1"><input type="checkbox" value="产品" checked><span>产品</span></label>
+                                <label class="flex items-center gap-1"><input type="checkbox" value="研发" checked><span>研发</span></label>
+                                <label class="flex items-center gap-1"><input type="checkbox" value="运营" checked><span>运营</span></label>
+                                <label class="flex items-center gap-1"><input type="checkbox" value="销售"><span>销售</span></label>
+                                <label class="flex items-center gap-1"><input type="checkbox" value="HR"><span>HR</span></label>
+                            </div>
+                        </div>
+                        <div class="space-y-4" id="questionsList"></div>
+                        <button onclick="submitSurvey()" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 mt-4"><i class="fa fa-paper-plane mr-2"></i>提交评估</button>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div class="bg-white rounded-xl shadow p-5 text-center">
+                        <div class="text-gray-500 text-sm">摩擦指数</div>
+                        <div id="frictionScore" class="text-4xl font-bold text-indigo-600 mt-2">-</div>
+                        <div id="frictionLabel" class="text-sm text-gray-500 mt-1">填写问卷后显示</div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-5">
+                        <h4 class="font-bold text-sm mb-2"><i class="fa fa-bolt mr-1 text-indigo-600"></i>摩擦类型识别</h4>
+                        <div id="frictionTypes" class="text-sm"></div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-5">
+                        <h4 class="font-bold text-sm mb-2"><i class="fa fa-database mr-1 text-indigo-600"></i>示例数据</h4>
+                        <div class="space-y-2 text-sm">
+                            <button onclick="loadDemo(1)" class="w-full text-left p-2 bg-gray-50 rounded hover:bg-indigo-50">示例1：研发-产品协作</button>
+                            <button onclick="loadDemo(2)" class="w-full text-left p-2 bg-gray-50 rounded hover:bg-indigo-50">示例2：市场-研发断层</button>
+                            <button onclick="loadDemo(3)" class="w-full text-left p-2 bg-gray-50 rounded hover:bg-indigo-50">示例3：全部门大协作</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 摩擦热力图Tab -->
+        <div id="tab-heatmap" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow p-6">
+                <h3 class="font-bold mb-4"><i class="fa fa-fire mr-2 text-indigo-600"></i>部门摩擦热力图</h3>
+                <p class="text-sm text-gray-500 mb-4">颜色越深表示摩擦越严重，灰色表示无数据</p>
+                <div id="heatmapGrid" class="max-w-lg mx-auto"></div>
+            </div>
+        </div>
+
+        <!-- 改进报告Tab -->
+        <div id="tab-report" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold"><i class="fa fa-lightbulb-o mr-2 text-indigo-600"></i>改进建议</h3>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="suggestionSearch" oninput="filterSuggestions(this.value)" class="border rounded p-1.5 text-xs w-36" placeholder="搜索建议...">
+                            <button onclick="generateImprovementPlan()" class="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs hover:bg-indigo-700"><i class="fa fa-list-ul mr-1"></i>一键改进计划</button>
+                        </div>
+                    </div>
+                    <div id="reportSuggestions" class="space-y-3"></div>
+                </div>
+                <div class="bg-white rounded-xl shadow p-6">
+                    <h3 class="font-bold mb-4"><i class="fa fa-file-text-o mr-2 text-indigo-600"></i>报告预览 <button onclick="copyReport()" class="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"><i class="fa fa-copy"></i> 复制Markdown</button></h3>
+                    <pre id="reportMarkdown" class="bg-gray-50 p-4 rounded text-sm whitespace-pre-wrap font-mono text-gray-700 max-h-96 overflow-y-auto"></pre>
+                </div>
+            </div>
+            <!-- 改进计划面板 -->
+            <div id="improvementPlanPanel" class="hidden mt-6 bg-white rounded-xl shadow p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold"><i class="fa fa-tasks mr-2 text-emerald-600"></i>改进计划（高优先级汇总）</h3>
+                    <button onclick="closeImprovementPlan()" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times"></i></button>
+                </div>
+                <div id="improvementPlanList" class="space-y-2"></div>
+                <button onclick="copyImprovementPlan()" class="mt-4 bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700"><i class="fa fa-copy mr-1"></i>复制计划</button>
+            </div>
+        </div>
+
+        <!-- 行动计划追踪Tab -->
+        <div id="tab-action" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-xl shadow p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold"><i class="fa fa-tasks mr-2 text-indigo-600"></i>行动计划执行追踪</h3>
+                            <div class="flex gap-2">
+                                <select id="actionFilter" onchange="renderActions()" class="border rounded p-1.5 text-xs">
+                                    <option value="all">全部状态</option>
+                                    <option value="待执行">待执行</option>
+                                    <option value="进行中">进行中</option>
+                                    <option value="已完成">已完成</option>
+                                </select>
+                                <button onclick="addManualAction()" class="bg-emerald-600 text-white px-2.5 py-1.5 rounded text-xs hover:bg-emerald-700"><i class="fa fa-plus mr-1"></i>新增行动</button>
+                            </div>
+                        </div>
+                        <div id="actionList" class="space-y-3"></div>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div class="bg-white rounded-xl shadow p-5">
+                        <h4 class="font-bold text-sm mb-3"><i class="fa fa-bar-chart mr-1 text-indigo-600"></i>执行统计</h4>
+                        <div id="actionStats" class="space-y-2 text-sm"></div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-5">
+                        <h4 class="font-bold text-sm mb-3"><i class="fa fa-bell mr-1 text-indigo-600"></i>周期性评估提醒</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-xs text-gray-500 block mb-1">提醒频率</label>
+                                <select id="reminderFrequency" onchange="updateReminderConfig()" class="border rounded p-1.5 text-xs w-full">
+                                    <option value="never">不提醒</option>
+                                    <option value="weekly">每周提醒</option>
+                                    <option value="monthly">每月提醒</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500 block mb-1">上次评估日期</label>
+                                <input type="date" id="lastAssessmentDate" onchange="updateReminderConfig()" class="border rounded p-1.5 text-xs w-full">
+                            </div>
+                            <div id="reminderNextPreview" class="text-xs text-gray-500 bg-indigo-50 p-3 rounded"></div>
+                            <button onclick="requestReminderPermission()" class="w-full bg-indigo-600 text-white py-2 rounded text-xs hover:bg-indigo-700"><i class="fa fa-bell-o mr-1"></i>开启通知提醒</button>
+                            <div id="reminderStatus" class="text-xs text-green-600 hidden"><i class="fa fa-check-circle mr-1"></i>通知已开启</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 新增行动表单 -->
+            <div id="addActionPanel" class="hidden mt-4 bg-white rounded-xl shadow p-6 max-w-2xl mx-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-sm"><i class="fa fa-plus-circle mr-2 text-emerald-600"></i>新增行动项</h3>
+                    <button onclick="cancelAddAction()" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times"></i></button>
+                </div>
+                <div class="space-y-3">
+                    <div><label class="block text-xs text-gray-500 mb-1">行动标题</label><input type="text" id="newActionTitle" class="w-full border rounded p-2 text-sm"></div>
+                    <div><label class="block text-xs text-gray-500 mb-1">类型</label><select id="newActionType" class="w-full border rounded p-2 text-sm"><option value="信息不对称">信息不对称</option><option value="流程断层">流程断层</option><option value="责任模糊">责任模糊</option><option value="通用">通用</option></select></div>
+                    <div><label class="block text-xs text-gray-500 mb-1">负责人</label><input type="text" id="newActionOwner" class="w-full border rounded p-2 text-sm" placeholder="部门/人名"></div>
+                    <div><label class="block text-xs text-gray-500 mb-1">截止日期</label><input type="date" id="newActionDeadline" class="w-full border rounded p-2 text-sm"></div>
+                </div>
+                <button onclick="saveManualAction()" class="w-full bg-emerald-600 text-white py-2 rounded text-sm hover:bg-emerald-700 mt-4"><i class="fa fa-save mr-1"></i>保存</button>
+            </div>
+        </div>
+
+        <!-- 历史Tab -->
+        <div id="tab-history" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold"><i class="fa fa-history mr-2 text-indigo-600"></i>评估历史</h3>
+                    <button onclick="clearHistory()" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"><i class="fa fa-trash"></i> 清空</button>
+                </div>
+                <div id="historyList" class="space-y-3"></div>
+                <div class="mt-6">
+                    <canvas id="trendChart" height="180"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 10道诊断题
+        const QUESTIONS = [
+            { id: 'q1', text: '信息传递是否及时准确？', dim: 'info' },
+            { id: 'q2', text: '跨部门沟通渠道是否畅通？', dim: 'info' },
+            { id: 'q3', text: '是否经常因信息缺失导致返工？', dim: 'info', reverse: true },
+            { id: 'q4', text: '各部门工作流程衔接是否顺畅？', dim: 'process' },
+            { id: 'q5', text: '是否存在重复审批环节？', dim: 'process', reverse: true },
+            { id: 'q6', text: '跨部门协作流程是否有明确SOP？', dim: 'process' },
+            { id: 'q7', text: '各部门责任边界是否清晰？', dim: 'resp' },
+            { id: 'q8', text: '出现问题是否经常推诿？', dim: 'resp', reverse: true },
+            { id: 'q9', text: 'KPI设定是否考虑了跨部门协作？', dim: 'resp' },
+            { id: 'q10', text: '管理层对跨部门协作是否足够重视？', dim: 'process' }
+        ];
+
+        let surveys = JSON.parse(localStorage.getItem('frictionSurveys') || '[]');
+        let currentResult = null;
+        // 行动计划数据
+        let actions = JSON.parse(localStorage.getItem('frictionActions') || '[]');
+        // 周期性评估配置
+        let reminderConfig = JSON.parse(localStorage.getItem('frictionReminderConfig') || '{"frequency":"never","lastDate":""}');
+        let reminderTimer = null;
+
+        function save() { localStorage.setItem('frictionSurveys', JSON.stringify(surveys)); }
+        function saveActions() { localStorage.setItem('frictionActions', JSON.stringify(actions)); }
+        function saveReminderConfig() { localStorage.setItem('frictionReminderConfig', JSON.stringify(reminderConfig)); }
+
+        function showTab(name) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.className = 'tab-btn px-3 py-1 rounded hover:bg-indigo-500');
+            document.getElementById('tab-' + name).classList.remove('hidden');
+            if (name === 'heatmap') renderHeatmap();
+            if (name === 'report' && currentResult) renderReport();
+            if (name === 'history') renderHistory();
+            if (name === 'action') { renderActions(); initReminderUI(); }
+        }
+
+        function renderQuestions() {
+            const container = document.getElementById('questionsList');
+            container.innerHTML = QUESTIONS.map((q, i) => {
+                const labels = ['极不同意', '不同意', '中立', '同意', '非常同意'];
+                const opts = labels.map((l, v) =>
+                    `<label class="flex flex-col items-center cursor-pointer ${v === 2 ? 'text-indigo-600 font-bold' : ''}">
+                        <input type="radio" name="${q.id}" value="${v + 1}" ${v === 2 ? 'checked' : ''} class="sr-only peer">
+                        <span class="w-8 h-8 flex items-center justify-center rounded-full peer-checked:bg-indigo-600 peer-checked:text-white text-xs border border-gray-300 hover:bg-indigo-100">${v + 1}</span>
+                        <span class="text-[10px] mt-0.5 ${v === 2 ? 'text-indigo-600' : 'text-gray-400'}">${l}</span>
+                    </label>`
+                ).join('');
+                return `<div class="p-3 bg-gray-50 rounded-lg"><div class="text-sm font-medium mb-2">${i + 1}. ${q.text}</div><div class="flex justify-around">${opts}</div></div>`;
+            }).join('');
+        }
+
+        function getDept() {
+            return Array.from(document.querySelectorAll('#deptCheckbox input:checked')).map(c => c.value);
+        }
+
+        function submitSurvey() {
+            const dept = getDept();
+            if (dept.length === 0) { alert('请至少选择一个部门'); return; }
+
+            const scores = {};
+            QUESTIONS.forEach(q => {
+                const val = parseInt(document.querySelector(`input[name="${q.id}"]:checked`)?.value || '3');
+                scores[q.id] = q.reverse ? 6 - val : val;
+            });
+
+            const dims = {};
+            QUESTIONS.forEach(q => {
+                if (!dims[q.dim]) dims[q.dim] = [];
+                dims[q.dim].push(scores[q.id]);
+            });
+            const dimAvg = {};
+            Object.keys(dims).forEach(k => dimAvg[k] = dims[k].reduce((s, v) => s + v, 0) / dims[k].length);
+
+            const total = Object.values(dimAvg).reduce((s, v) => s + v, 0) / 3;
+            const frictionTotal = 6 - total;
+
+            const types = [];
+            if (dimAvg.info < 3) types.push({ type: '信息不对称', score: dimAvg.info, desc: '部门间信息传递不畅，存在信息孤岛' });
+            if (dimAvg.process < 3) types.push({ type: '流程断层', score: dimAvg.process, desc: '跨部门流程衔接不顺，协作效率低' });
+            if (dimAvg.resp < 3) types.push({ type: '责任模糊', score: dimAvg.resp, desc: '责任边界不清晰，容易出现推诿' });
+
+            currentResult = { dept, dimAvg, frictionTotal, types, scores, date: new Date().toISOString() };
+
+            document.getElementById('frictionScore').textContent = frictionTotal.toFixed(1);
+            let label = '摩擦较低';
+            if (frictionTotal >= 4) label = '摩擦严重';
+            else if (frictionTotal >= 3) label = '摩擦中等';
+            else if (frictionTotal >= 2) label = '摩擦较低';
+            document.getElementById('frictionLabel').textContent = label;
+
+            const ftDiv = document.getElementById('frictionTypes');
+            if (types.length === 0) {
+                ftDiv.innerHTML = '<div class="text-green-600">未检测到明显摩擦</div>';
+            } else {
+                ftDiv.innerHTML = types.map(t =>
+                    `<div class="flex items-start gap-2 p-2 mb-1 rounded ${t.score < 2 ? 'bg-red-50' : 'bg-yellow-50'}">
+                        <i class="fa fa-exclamation-triangle text-${t.score < 2 ? 'red' : 'yellow'}-500 mt-0.5"></i>
+                        <div><div class="font-medium">${t.type}</div><div class="text-xs text-gray-500">${t.desc}</div></div>
+                    </div>`
+                ).join('');
+            }
+
+            surveys.push(currentResult);
+            save();
+
+            // 自动生成行动计划
+            autoGenerateActions(currentResult);
+
+            renderHeatmap();
+        }
+
+        // ============================================================
+        // 行动计划执行追踪
+        // ============================================================
+        function autoGenerateActions(result) {
+            const typeMap = {
+                '信息不对称': [
+                    { title: '建立跨部门信息共享平台', steps: ['评估沟通工具', '设立共享文档库', '配置信息推送规则'] },
+                    { title: '实施信息传递标准化', steps: ['制定标准模板', '关键决策书面记录', '建立信息分级制度'] },
+                    { title: '定期跨部门信息同步会', steps: ['每日站会', '每周例会', '每月战略对齐会'] }
+                ],
+                '流程断层': [
+                    { title: '全流程梳理与SOP建设', steps: ['绘制协作流程图', '识别瓶颈节点', '制定SOP文档'] },
+                    { title: '精简审批环节', steps: ['评估审批流程', '推行并联审批', '设置自动审批规则'] },
+                    { title: '建立SLA服务级别协议', steps: ['制定响应时间承诺', '明确处理时限', '超时自动升级机制'] }
+                ],
+                '责任模糊': [
+                    { title: '建立RACI责任矩阵', steps: ['梳理协作事项', '明确R/A/C/I角色', '发布全员知悉'] },
+                    { title: '将协作纳入KPI考核', steps: ['设计协作互评', '纳入绩效考核', '设置协作奖励'] },
+                    { title: '建立争议解决机制', steps: ['制定升级路径', '设置裁决时限', '建立仲裁制度'] }
+                ]
+            };
+
+            result.types.forEach(t => {
+                const templates = typeMap[t.type] || [];
+                templates.forEach((tmpl, i) => {
+                    const exists = actions.some(a => a.title === tmpl.title);
+                    if (!exists) {
+                        actions.push({
+                            id: Date.now() + '_' + i,
+                            title: tmpl.title,
+                            type: t.type,
+                            owner: '',
+                            deadline: '',
+                            status: '待执行',
+                            steps: tmpl.steps,
+                            createdAt: new Date().toISOString()
+                        });
+                    }
+                });
+            });
+            saveActions();
+        }
+
+        function addManualAction() {
+            document.getElementById('addActionPanel').classList.remove('hidden');
+            document.getElementById('newActionDeadline').value = new Date().toISOString().slice(0, 10);
+            document.getElementById('newActionTitle').value = '';
+            document.getElementById('newActionTitle').focus();
+        }
+
+        function cancelAddAction() {
+            document.getElementById('addActionPanel').classList.add('hidden');
+        }
+
+        function saveManualAction() {
+            const title = document.getElementById('newActionTitle').value.trim();
+            const type = document.getElementById('newActionType').value;
+            const owner = document.getElementById('newActionOwner').value.trim();
+            const deadline = document.getElementById('newActionDeadline').value;
+            if (!title) { alert('请输入行动标题'); return; }
+            actions.push({
+                id: Date.now(),
+                title, type, owner, deadline,
+                status: '待执行',
+                steps: [],
+                createdAt: new Date().toISOString()
+            });
+            saveActions();
+            cancelAddAction();
+            renderActions();
+            addToast('新增行动项: ' + title);
+        }
+
+        function renderActions() {
+            const filter = document.getElementById('actionFilter').value;
+            let filtered = actions;
+            if (filter !== 'all') filtered = actions.filter(a => a.status === filter);
+
+            const list = document.getElementById('actionList');
+            if (filtered.length === 0) {
+                list.innerHTML = '<div class="text-center py-10 text-gray-400">暂无行动计划，请先完成问卷调查</div>';
+            } else {
+                list.innerHTML = filtered.map((a, idx) => {
+                    const statusColor = a.status === '已完成' ? 'border-green-400 bg-green-50' : a.status === '进行中' ? 'border-blue-400 bg-blue-50' : 'border-gray-300 bg-white';
+                    const nextStatus = a.status === '待执行' ? '进行中' : a.status === '进行中' ? '已完成' : '已完成';
+                    const nextColor = a.status === '待执行' ? 'bg-blue-500' : 'bg-green-500';
+                    return `<div class="p-4 rounded-lg border-l-4 ${statusColor}">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-medium text-sm">${a.title}</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full ${a.status === '已完成' ? 'bg-green-100 text-green-700' : a.status === '进行中' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}">${a.status}</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">类型: ${a.type}${a.owner ? ' | 负责人: ' + a.owner : ''}${a.deadline ? ' | 截止: ' + a.deadline : ''}</div>
+                                ${a.steps && a.steps.length > 0 ? `<div class="text-xs text-gray-400 mt-1">步骤: ${a.steps.join(' → ')}</div>` : ''}
+                            </div>
+                            <div class="flex gap-1 ml-2">
+                                <button onclick="updateActionStatus('${a.id}')" class="text-xs px-2 py-1 rounded ${nextColor} text-white hover:opacity-80">${a.status === '已完成' ? '<i class="fa fa-check"></i>' : '标为' + nextStatus}</button>
+                                <button onclick="deleteAction('${a.id}')" class="text-red-400 hover:text-red-600"><i class="fa fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+
+            // 统计
+            const total = actions.length;
+            const pending = actions.filter(a => a.status === '待执行').length;
+            const progress = actions.filter(a => a.status === '进行中').length;
+            const done = actions.filter(a => a.status === '已完成').length;
+            const rate = total > 0 ? Math.round(done / total * 100) : 0;
+            document.getElementById('actionStats').innerHTML = `
+                <div class="flex justify-between"><span>总数</span><span class="font-bold">${total}</span></div>
+                <div class="flex justify-between"><span>待执行</span><span class="text-gray-600">${pending}</span></div>
+                <div class="flex justify-between"><span>进行中</span><span class="text-blue-600">${progress}</span></div>
+                <div class="flex justify-between"><span>已完成</span><span class="text-green-600">${done}</span></div>
+                <div class="flex justify-between border-t pt-2 mt-2"><span>完成率</span><span class="font-bold text-emerald-600">${rate}%</span></div>
+                <div class="w-full bg-gray-200 rounded-full h-2 mt-2"><div class="bg-emerald-500 h-2 rounded-full" style="width:${rate}%"></div></div>
+            `;
+        }
+
+        function updateActionStatus(id) {
+            const a = actions.find(x => x.id === id);
+            if (!a) return;
+            if (a.status === '待执行') a.status = '进行中';
+            else if (a.status === '进行中') a.status = '已完成';
+            else a.status = '待执行';
+            saveActions();
+            renderActions();
+        }
+
+        function deleteAction(id) {
+            if (!confirm('确定删除该行动项？')) return;
+            actions = actions.filter(a => a.id !== id);
+            saveActions();
+            renderActions();
+        }
+
+        // ============================================================
+        // 周期性评估提醒
+        // ============================================================
+        function initReminderUI() {
+            document.getElementById('reminderFrequency').value = reminderConfig.frequency || 'never';
+            document.getElementById('lastAssessmentDate').value = reminderConfig.lastDate || '';
+            updateReminderPreview();
+
+            if (reminderConfig.frequency !== 'never' && reminderConfig.lastDate) {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    document.getElementById('reminderStatus').classList.remove('hidden');
+                }
+            }
+        }
+
+        function updateReminderConfig() {
+            reminderConfig.frequency = document.getElementById('reminderFrequency').value;
+            reminderConfig.lastDate = document.getElementById('lastAssessmentDate').value;
+            saveReminderConfig();
+            updateReminderPreview();
+            if (reminderConfig.frequency !== 'never' && reminderConfig.lastDate) {
+                startReminderCheck();
+            } else {
+                if (reminderTimer) clearInterval(reminderTimer);
+            }
+        }
+
+        function updateReminderPreview() {
+            const el = document.getElementById('reminderNextPreview');
+            if (reminderConfig.frequency === 'never' || !reminderConfig.lastDate) {
+                el.innerHTML = '未设置周期性评估提醒';
+                return;
+            }
+            const lastDate = new Date(reminderConfig.lastDate);
+            const now = new Date();
+            let nextDate;
+            if (reminderConfig.frequency === 'weekly') {
+                nextDate = new Date(lastDate);
+                nextDate.setDate(nextDate.getDate() + 7);
+                while (nextDate <= now) nextDate.setDate(nextDate.getDate() + 7);
+            } else {
+                nextDate = new Date(lastDate);
+                nextDate.setMonth(nextDate.getMonth() + 1);
+                while (nextDate <= now) nextDate.setMonth(nextDate.getMonth() + 1);
+            }
+            const diffDays = Math.floor((nextDate - now) / (1000 * 60 * 60 * 24));
+            el.innerHTML = `频率: ${reminderConfig.frequency === 'weekly' ? '每周' : '每月'}<br>下次提醒: ${nextDate.toLocaleDateString('zh-CN')} (${diffDays > 0 ? '还剩 ' + diffDays + ' 天' : '今天'})`;
+        }
+
+        function requestReminderPermission() {
+            if (!('Notification' in window)) {
+                alert('您的浏览器不支持系统通知功能');
+                return;
+            }
+            if (Notification.permission === 'default') {
+                Notification.requestPermission().then(perm => {
+                    if (perm === 'granted') {
+                        document.getElementById('reminderStatus').classList.remove('hidden');
+                        addToast('通知已开启');
+                        startReminderCheck();
+                        new Notification('跨部门协作摩擦检测', { body: '评估提醒通知已开启' });
+                    } else {
+                        alert('需要允许通知权限');
+                    }
+                });
+            } else if (Notification.permission === 'granted') {
+                document.getElementById('reminderStatus').classList.remove('hidden');
+                addToast('通知已开启');
+                startReminderCheck();
+            } else {
+                alert('通知权限已被拒绝，请在浏览器设置中重新开启');
+            }
+        }
+
+        function startReminderCheck() {
+            if (reminderTimer) clearInterval(reminderTimer);
+            checkReminder();
+            reminderTimer = setInterval(checkReminder, 60000);
+        }
+
+        function checkReminder() {
+            if (reminderConfig.frequency === 'never' || !reminderConfig.lastDate) return;
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+            const now = new Date();
+            const lastDate = new Date(reminderConfig.lastDate);
+            let shouldRemind = false;
+
+            if (reminderConfig.frequency === 'weekly') {
+                const diffDays = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
+                if (diffDays >= 7 && diffDays % 7 === 0) shouldRemind = true;
+            } else if (reminderConfig.frequency === 'monthly') {
+                const nextMonth = new Date(lastDate);
+                nextMonth.setMonth(nextMonth.getMonth() + 1);
+                if (now >= nextMonth) shouldRemind = true;
+            }
+
+            if (shouldRemind) {
+                try {
+                    new Notification('跨部门协作评估提醒', {
+                        body: reminderConfig.frequency === 'weekly' ? '已到每周评估时间，请进行一次协作摩擦诊断。' : '已到每月评估时间，请进行一次协作摩擦诊断。',
+                        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📋</text></svg>'
+                    });
+                } catch(e) {
+                    new Notification('跨部门协作评估提醒', { body: '请进行一次协作摩擦诊断。' });
+                }
+                // 更新触发标记
+                const key = 'friction_last_reminded_' + reminderConfig.frequency;
+                localStorage.setItem(key, now.toISOString());
+            }
+        }
+
+        function renderHeatmap() {
+            const grid = document.getElementById('heatmapGrid');
+            const allDepts = ['市场', '产品', '研发', '运营', '销售', 'HR'];
+            const dept = currentResult?.dept || allDepts;
+            const pairs = [];
+            for (let i = 0; i < dept.length; i++) {
+                for (let j = i + 1; j < dept.length; j++) {
+                    pairs.push({ a: dept[i], b: dept[j] });
+                }
+            }
+
+            const dimAvg = currentResult?.dimAvg || { info: 5, process: 5, resp: 5 };
+            const dims = ['info', 'process', 'resp'];
+            const dimLabels = { info: '信息不对称', process: '流程断层', resp: '责任模糊' };
+
+            let html = `<table class="w-full text-center text-sm border-collapse"><thead><tr><th class="p-2"></th>`;
+            dims.forEach(d => { html += `<th class="p-2 text-indigo-700 font-bold">${dimLabels[d]}</th>`; });
+            html += `</tr></thead><tbody>`;
+
+            const colorMap = (v) => {
+                if (v >= 4.5) return 'bg-red-700';
+                if (v >= 4) return 'bg-red-500';
+                if (v >= 3.5) return 'bg-orange-500';
+                if (v >= 3) return 'bg-orange-300';
+                if (v >= 2.5) return 'bg-yellow-300';
+                if (v >= 2) return 'bg-yellow-100';
+                return 'bg-green-200';
+            };
+
+            pairs.slice(0, 6).forEach(p => {
+                html += `<tr><td class="p-2 font-medium text-left text-xs">${p.a} ↔ ${p.b}</td>`;
+                dims.forEach(d => {
+                    const v = dimAvg[d] || 5;
+                    html += `<td class="p-1"><div class="${colorMap(6 - v)} rounded p-2 text-white text-xs font-bold">${(6 - v).toFixed(1)}</div></td>`;
+                });
+                html += `</tr>`;
+            });
+            html += '</tbody></table>';
+
+            if (!currentResult) {
+                html = '<div class="text-center text-gray-400 py-10">请先完成问卷调查</div>';
+            }
+            grid.innerHTML = html;
+        }
+
+        function renderReport() {
+            if (!currentResult) return;
+
+            allSuggestions = generateAllSuggestions();
+            renderSuggestions(allSuggestions);
+            document.getElementById('suggestionSearch').value = '';
+
+            const md = generateMarkdown(currentResult, allSuggestions);
+            document.getElementById('reportMarkdown').textContent = md;
+        }
+
+        let allSuggestions = [];
+
+        function generateAllSuggestions() {
+            const dimAvg = currentResult.dimAvg;
+            const deptNames = currentResult.dept.join('、');
+            const suggestions = [];
+
+            const infoTips = [
+                { icon: 'fa-envelope', title: '建立跨部门信息共享平台', steps: ['评估现有沟通工具，选择统一协作平台（飞书/钉钉/企业微信）', '设立跨部门共享文档库，统一存放SOP、项目进展、会议纪要', '配置自动化信息推送规则，关键更新实时通知相关方'], effect: '消除信息孤岛，信息传递效率提升60%', priority: '高' },
+                { icon: 'fa-bullhorn', title: '实施信息传递标准化', steps: ['制定信息传递标准模板（周报模板、会议纪要模板、需求模板）', '关键决策须书面记录并抄送相关方', '建立信息分级制度，明确不同层级信息的传递范围和频率'], effect: '减少口头传递导致的信息失真，降低沟通成本', priority: '高' },
+                { icon: 'fa-calendar-check-o', title: '定期跨部门信息同步会', steps: ['设立每日15分钟站会（同步进展和阻塞）', '每周跨部门例会（汇报核心指标和风险）', '每月战略对齐会（同步长期目标和重大变更）'], effect: '确保各方信息同步，提前识别潜在冲突', priority: '中' },
+                { icon: 'fa-dashboard', title: '搭建信息透明度看板', steps: ['使用共享仪表盘展示各部门关键指标', '项目进展可视化（甘特图/燃尽图）', '公开各团队OKR和关键成果'], effect: '信息透明化，减少猜疑和信息不对称', priority: '中' },
+                { icon: 'fa-users', title: '设立信息联络人制度', steps: ['各部门指定1-2名信息联络人', '联络人参加所有跨部门信息会议', '建立联络人沟通群组，确保信息快速流转'], effect: '减少信息传递层级，降低信息衰减', priority: '低' }
+            ];
+
+            const processTips = [
+                { icon: 'fa-sitemap', title: '全流程梳理与SOP建设', steps: ['绘制现有协作流程图，标注所有节点', '识别瓶颈节点和重复审批环节', '针对每个节点制定SOP文档（输入、输出、责任人、时限）'], effect: '流程标准化后，跨部门协作效率预计提升40%', priority: '高' },
+                { icon: 'fa-compress', title: '精简审批环节', steps: ['评估现有审批流程，识别冗余环节', '推行并联审批代替串联审批', '设置自动审批规则（低风险事项自动通过）'], effect: '审批周期缩短50%以上', priority: '高' },
+                { icon: 'fa-clock-o', title: '建立SLA服务级别协议', steps: ['各部门制定服务响应时间承诺', '明确跨部门请求的处理时限（紧急2h/常规24h）', '超时自动升级机制'], effect: '减少等待时间，提升协作响应速度', priority: '高' },
+                { icon: 'fa-exchange', title: '优化交接流程', steps: ['定义清晰的交接清单和验收标准', '推行交接确认制（交接方和接收方双签确认）', '建立交接异常处理机制'], effect: '减少因交接不清导致的返工', priority: '中' },
+                { icon: 'fa-repeat', title: '定期流程复盘与优化', steps: ['每月复盘关键协作流程执行情况', '收集各部门对流程的改进建议', '每季度更新SOP文档'], effect: '持续优化流程，适应业务变化', priority: '中' }
+            ];
+
+            const respTips = [
+                { icon: 'fa-tasks', title: '建立RACI责任矩阵', steps: ['梳理所有跨部门协作事项', '明确每项工作的负责方(R)、审批方(A)、咨询方(C)、知会方(I)', '发布RACI矩阵并全员知悉'], effect: '消除责任盲区，减少推诿现象', priority: '高' },
+                { icon: 'fa-gavel', title: '将协作纳入KPI考核', steps: ['设计跨部门协作满意度互评问卷', '将协作表现纳入个人和团队季度KPI', '设置协作专项奖励（如最佳协作团队奖）'], effect: '激励主动协作行为，改变"各扫门前雪"的文化', priority: '高' },
+                { icon: 'fa-handshake-o', title: '建立争议解决机制', steps: ['制定争议升级路径（责任人→部门负责人→管理层）', '设置争议裁决时限（24小时内给出初步裁决）', '建立仲裁委员会制度'], effect: '快速解决责任争议，避免项目延误', priority: '高' },
+                { icon: 'fa-file-text-o', title: '细化职责说明书', steps: ['更新各部门岗位职责说明书', '在职责说明书中明确跨部门协作职责', '新员工入职时进行职责边界培训'], effect: '从制度上明确每个人的协作职责', priority: '中' },
+                { icon: 'fa-check-square-o', title: '实施工作留痕制度', steps: ['关键决策和分工使用书面记录', '使用项目管理工具跟踪任务分配', '建立定期汇报机制，确保责任落实'], effect: '责任可追溯，减少"没人做/没人承认"的情况', priority: '中' }
+            ];
+
+            if (dimAvg.info < 3.5) infoTips.forEach((t, i) => suggestions.push({ ...t, type: '信息不对称', id: 'info_' + i }));
+            if (dimAvg.process < 3.5) processTips.forEach((t, i) => suggestions.push({ ...t, type: '流程断层', id: 'process_' + i }));
+            if (dimAvg.resp < 3.5) respTips.forEach((t, i) => suggestions.push({ ...t, type: '责任模糊', id: 'resp_' + i }));
+
+            if (suggestions.length === 0) suggestions.push({ icon: 'fa-thumbs-up', title: '协作状态良好', steps: ['保持现状并定期复盘', '每季度做一次协作诊断', '关注团队成员反馈'], effect: '持续优化协作流程', priority: '低', type: '通用', id: 'general_0' });
+
+            const priorityOrder = { '高': 0, '中': 1, '低': 2 };
+            suggestions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+            return suggestions;
+        }
+
+        function renderSuggestions(suggestions) {
+            const el = document.getElementById('reportSuggestions');
+            if (suggestions.length === 0) {
+                el.innerHTML = '<div class="text-gray-400 text-center py-8">暂无建议</div>';
+                return;
+            }
+            el.innerHTML = suggestions.map((s, i) => {
+                const pClass = s.priority === '高' ? 'bg-red-100 text-red-700' : s.priority === '中' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600';
+                const stepsHtml = s.steps ? s.steps.map((st, si) => `<div class="text-xs text-gray-500 pl-3 border-l-2 border-indigo-200 mb-1">步骤${si+1}：${st}</div>`).join('') : '';
+                // 添加到行动计划按钮
+                return `<div class="suggestion-card p-4 bg-indigo-50 rounded-lg border-l-4 border-indigo-500" data-suggestion="${s.id}">
+                    <div class="flex items-start justify-between mb-2">
+                        <h4 class="font-medium text-indigo-700 text-sm"><i class="fa ${s.icon} mr-1"></i>${i + 1}. ${s.title}</h4>
+                        <span class="text-xs px-2 py-0.5 rounded-full ${pClass}">${s.priority}优先级</span>
+                    </div>
+                    <div class="text-xs text-indigo-500 mb-1">针对：${s.type}</div>
+                    ${stepsHtml}
+                    <div class="text-xs text-emerald-600 mt-1"><i class="fa fa-line-chart mr-1"></i>预期效果：${s.effect}</div>
+                    <button onclick="addToAction('${s.title}', '${s.type}')" class="text-xs text-emerald-600 hover:text-emerald-800 mt-1"><i class="fa fa-plus-circle mr-1"></i>添加到行动计划</button>
+                </div>`;
+            }).join('');
+        }
+
+        function addToAction(title, type) {
+            const exists = actions.some(a => a.title === title);
+            if (exists) { addToast('该行动项已存在'); return; }
+            actions.push({
+                id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                title, type, owner: '', deadline: '', status: '待执行', steps: [], createdAt: new Date().toISOString()
+            });
+            saveActions();
+            addToast('已添加到行动计划: ' + title);
+        }
+
+        function filterSuggestions(query) {
+            const cards = document.querySelectorAll('.suggestion-card');
+            if (!query.trim()) { cards.forEach(c => c.style.display = ''); return; }
+            const q = query.toLowerCase();
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                card.style.display = text.includes(q) ? '' : 'none';
+            });
+        }
+
+        function generateImprovementPlan() {
+            const highPriority = allSuggestions.filter(s => s.priority === '高');
+            const panel = document.getElementById('improvementPlanPanel');
+            const list = document.getElementById('improvementPlanList');
+            if (highPriority.length === 0) {
+                list.innerHTML = '<div class="text-gray-400 text-center py-4">暂无高优先级建议</div>';
+            } else {
+                list.innerHTML = highPriority.map((s, i) =>
+                    `<div class="flex items-start gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                        <div class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">${i+1}</div>
+                        <div>
+                            <div class="font-medium text-sm text-emerald-800"><input type="checkbox" class="mr-2" checked>${s.title}</div>
+                            <div class="text-xs text-emerald-600 mt-1">${s.effect}</div>
+                            ${s.steps ? s.steps.map(st => `<div class="text-xs text-gray-500 mt-0.5 pl-4">- ${st}</div>`).join('') : ''}
+                        </div>
+                    </div>`
+                ).join('');
+            }
+            panel.classList.remove('hidden');
+        }
+
+        function closeImprovementPlan() { document.getElementById('improvementPlanPanel').classList.add('hidden'); }
+
+        function copyImprovementPlan() {
+            const items = document.querySelectorAll('#improvementPlanList .font-medium');
+            let text = '# 改进计划（高优先级）\n\n';
+            items.forEach((item, i) => { text += `${i+1}. ${item.textContent.replace('✓ ', '')}\n`; });
+            text += '\n---\n由跨部门协作摩擦检测系统自动生成';
+            copyToClipboard(text, '改进计划已复制到剪贴板');
+        }
+
+        function copyToClipboard(text, msg) {
+            navigator.clipboard.writeText(text).then(() => addToast(msg)).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                addToast(msg);
+            });
+        }
+
+        function addToast(msg) {
+            const el = document.createElement('div');
+            el.className = 'fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-lg shadow-lg text-sm z-50';
+            el.textContent = msg;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 2500);
+        }
+
+        function generateMarkdown(result, suggestions) {
+            const dimLabels = { info: '信息传递', process: '流程衔接', resp: '责任边界' };
+            let md = `# 跨部门协作摩擦诊断报告\n\n`;
+            md += `**评估日期：** ${new Date().toLocaleDateString('zh-CN')}\n`;
+            md += `**涉及部门：** ${result.dept.join('、')}\n`;
+            md += `**整体摩擦指数：** ${result.frictionTotal.toFixed(1)} / 5.0\n\n`;
+            md += `## 各维度得分\n\n`;
+            md += `| 维度 | 得分 | 状态 |\n|------|------|------|\n`;
+            Object.keys(result.dimAvg).forEach(k => {
+                const v = result.dimAvg[k]; const status = v >= 4 ? '良好' : v >= 3 ? '一般' : '需改进';
+                md += `| ${dimLabels[k]} | ${v.toFixed(1)} | ${status} |\n`;
+            });
+            md += `\n## 摩擦类型\n\n`;
+            if (result.types.length === 0) { md += '未检测到明显摩擦。\n'; }
+            else { result.types.forEach(t => { md += `- **${t.type}**（严重度：${(6 - t.score).toFixed(1)}/5）：${t.desc}\n`; }); }
+            md += `\n## 改进建议\n\n`;
+            suggestions.forEach((s, i) => {
+                md += `### ${i + 1}. ${s.title}（${s.priority}优先级）\n\n**针对：** ${s.type}\n\n**预期效果：** ${s.effect}\n\n`;
+                if (s.steps) { md += `**具体步骤：**\n`; s.steps.forEach((st, si) => { md += `  ${si + 1}. ${st}\n`; }); md += `\n`; }
+            });
+            md += `---\n*由跨部门协作摩擦检测系统自动生成*\n`;
+            return md;
+        }
+
+        function copyReport() {
+            const text = document.getElementById('reportMarkdown').textContent;
+            copyToClipboard(text, '报告已复制到剪贴板');
+        }
+
+        function loadDemo(n) {
+            const demos = [
+                { dept: ['市场', '产品', '研发'], scores: { q1: 2, q2: 3, q3: 5, q4: 2, q5: 4, q6: 2, q7: 3, q8: 4, q9: 2, q10: 3 } },
+                { dept: ['市场', '研发', '运营'], scores: { q1: 2, q2: 2, q3: 5, q4: 1, q5: 5, q6: 1, q7: 2, q8: 5, q9: 1, q10: 2 } },
+                { dept: ['市场', '产品', '研发', '运营', '销售', 'HR'], scores: { q1: 3, q2: 2, q3: 4, q4: 2, q5: 3, q6: 2, q7: 2, q8: 4, q9: 2, q10: 3 } }
+            ][n - 1];
+            document.querySelectorAll('#deptCheckbox input').forEach(c => { c.checked = demos.dept.includes(c.value); });
+            QUESTIONS.forEach(q => {
+                const val = demos.scores[q.id] || 3;
+                const radio = document.querySelector(`input[name="${q.id}"][value="${val}"]`);
+                if (radio) radio.checked = true;
+            });
+            submitSurvey();
+            showTab('heatmap');
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+            if (surveys.length === 0) { list.innerHTML = '<div class="text-center text-gray-400 py-8">暂无评估历史</div>'; return; }
+            list.innerHTML = surveys.slice().reverse().slice(0, 20).map((s, i) => {
+                const label = s.frictionTotal >= 4 ? 'text-red-600' : s.frictionTotal >= 3 ? 'text-orange-600' : s.frictionTotal >= 2 ? 'text-yellow-600' : 'text-green-600';
+                return `<div class="flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100">
+                    <div><div class="font-medium">${s.dept.join(' / ')}</div><div class="text-xs text-gray-500">${new Date(s.date).toLocaleDateString('zh-CN')}</div></div>
+                    <div class="flex items-center gap-3"><span class="text-xl font-bold ${label}">${s.frictionTotal.toFixed(1)}</span><button onclick="deleteSurvey(${surveys.indexOf(s)})" class="text-red-400 hover:text-red-600"><i class="fa fa-trash"></i></button></div>
+                </div>`;
+            }).join('');
+
+            if (surveys.length > 1) {
+                const sorted = surveys.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+                const vals = sorted.map(s => s.frictionTotal);
+                const maxVal = Math.max(...vals, 5); const minVal = Math.min(...vals, 0); const range = maxVal - minVal || 1;
+                const w = 600, h = 160, pad = 30;
+                let path = '';
+                vals.forEach((v, i) => { const x = pad + (i / (vals.length - 1 || 1)) * (w - 2 * pad); const y = h - pad - ((v - minVal) / range) * (h - 2 * pad); path += (i === 0 ? 'M' : 'L') + x.toFixed(0) + ',' + y.toFixed(0); });
+                const labelsHtml = sorted.map(s => `<span class="text-[10px] text-gray-400">${s.date.slice(5, 10)}</span>`).join('');
+                document.querySelector('#tab-history canvas').outerHTML =
+                    `<div class="relative" style="height:180px"><svg viewBox="0 0 600 180" class="w-full h-full"><polyline points="${path.slice(1).split('L').join(' ')}" fill="none" stroke="#6366f1" stroke-width="2"/>${vals.map((v, i) => { const x = pad + (i / (vals.length - 1 || 1)) * (w - 2 * pad); const y = h - pad - ((v - minVal) / range) * (h - 2 * pad); return `<circle cx="${x}" cy="${y}" r="4" fill="#6366f1"/>`; }).join('')}</svg><div class="flex justify-between px-2">${labelsHtml}</div></div>`;
+            }
+        }
+
+        function deleteSurvey(idx) { surveys.splice(idx, 1); save(); renderHistory(); }
+        function clearHistory() { if (confirm('确定清空所有历史记录？')) { surveys = []; save(); renderHistory(); } }
+
+        renderQuestions();
+    </script>
+</body>
+</html>
